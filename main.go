@@ -1,13 +1,21 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
+
+type jsonResponse struct {
+	Page  string   `json:"page"`
+	Input string   `json:"input"`
+	Words []string `json:"words"`
+}
 
 func main() {
 	args := os.Args
@@ -42,6 +50,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("HTTP Status Code: %d\nBody: %s\n", response.StatusCode, body)
-	// Printf does the conversion []byte to string or ints
+	if response.StatusCode != 200 {
+		fmt.Printf("Invalid request (HTTP Status Code: %d\n),Body: %s", response.StatusCode, body)
+		os.Exit(1)
+	}
+
+	var words jsonResponse
+
+	err = json.Unmarshal(body, &words)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	joined_words := strings.Join(words.Words, ", ")
+	fmt.Printf("JSON Parsed\nPage: %s\nWords: %v\n", words.Page, joined_words)
 }
