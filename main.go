@@ -11,13 +11,22 @@ import (
 	"strings"
 )
 
-type jsonResponse struct {
-	Page  string   `json:"page"`
+/* STRUCTS TO LAYOUT THE GET RESPONSE */
+type Page struct {
+	Name string `json:"page"`
+}
+
+type Words struct {
 	Input string   `json:"input"`
 	Words []string `json:"words"`
 }
 
+type Occurrence struct {
+	Words map[string]int `json:"words"`
+}
+
 func main() {
+	/* CHECK URL VALIDITY */
 	args := os.Args
 
 	if len(args) < 2 {
@@ -28,7 +37,7 @@ func main() {
 	if _, err := url.ParseRequestURI(args[1]); err != nil {
 		fmt.Printf("URL not valid format: %s\n", err)
 	}
-
+	/* GET REQUEST LOGIC */
 	response, err := http.Get(args[1])
 
 	if err != nil {
@@ -55,13 +64,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	var words jsonResponse
+	var page Page
 
-	err = json.Unmarshal(body, &words)
+	err = json.Unmarshal(body, &page)
 
 	if err != nil {
 		log.Fatal(err)
 	}
-	joined_words := strings.Join(words.Words, ", ")
-	fmt.Printf("JSON Parsed\nPage: %s\nWords: %v\n", words.Page, joined_words)
+
+	switch page.Name {
+	case "words":
+		var words Words
+
+		err = json.Unmarshal(body, &words)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		joined_words := strings.Join(words.Words, ", ")
+		fmt.Printf("JSON Parsed\nPage: %s\nWords: %v\n", page.Name, joined_words)
+	case "occurrence":
+		var occurrence Occurrence
+
+		err = json.Unmarshal(body, &occurrence)
+
+		if err != nil {
+			log.Fatal(err)
+		}
+		for key, value := range occurrence.Words {
+			fmt.Printf("%s: %d\n", key, value)
+		}
+	default:
+		fmt.Println("Page not found!")
+	}
+
 }
