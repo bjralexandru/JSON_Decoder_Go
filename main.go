@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -42,14 +43,30 @@ func (o Occurrence) GetResponse() string {
 }
 
 func main() {
-	/* CHECK URL VALIDITY */
-	args := os.Args
+	var (
+		requestURL string
+		password   string
+		parsedURL  *url.URL // Used in doRequest() as a String()
+		err        error
+	)
 
-	if len(args) < 2 {
-		fmt.Println("Usage ./http-get <url>")
+	/* Instead of using CLI arguments we're using flags
+	Which are implemented through the flag package */
+
+	// Declaration
+	flag.StringVar(&requestURL, "url", "", "url to access")
+	flag.StringVar(&password, "psswd", "", "psswd for the api endpoint")
+
+	// Parse flags
+	flag.Parse()
+
+	if parsedURL, err = url.ParseRequestURI(requestURL); err != nil {
+		fmt.Printf("URL is not valid error: %s\n", err)
+		flag.Usage()
 		os.Exit(1)
 	}
-	res, err := doRequests(args[1])
+
+	res, err := doRequests(parsedURL.String())
 
 	if err != nil {
 		if requestErr, ok := err.(RequestError); ok {
@@ -69,9 +86,6 @@ func main() {
 
 func doRequests(requestURL string) (Response, error) {
 
-	if _, err := url.ParseRequestURI(requestURL); err != nil {
-		return nil, fmt.Errorf("URL is not valid error: %s", err)
-	}
 	/* GET REQUEST LOGIC */
 	response, err := http.Get(requestURL)
 
