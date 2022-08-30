@@ -52,8 +52,11 @@ func main() {
 	res, err := doRequests(args[1])
 
 	if err != nil {
-		fmt.Printf("Error: %s\n", err)
-		os.Exit(1)
+		if requestErr, ok := err.(RequestError); ok {
+			fmt.Printf("Error: %s (HTTP Code %d, Body: %s\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
+			os.Exit(1)
+		}
+
 	}
 
 	if res == nil {
@@ -95,12 +98,26 @@ func doRequests(requestURL string) (Response, error) {
 		return nil, fmt.Errorf("invalid output (HTTP Code %d): %s", response.StatusCode, string(body))
 	}
 
+	/* Did this beacuse the errors werent very nice for the
+	   end user */
+	if !json.Valid(body) {
+		return nil, RequestError{
+			HTTPCode: response.StatusCode,
+			Body:     string(body),
+			Err:      "no valid JSON returned",
+		}
+	}
+
 	var page Page
 
 	err = json.Unmarshal(body, &page)
 
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal error: %s", err)
+		return nil, RequestError{
+			HTTPCode: response.StatusCode,
+			Body:     string(body),
+			Err:      fmt.Sprintf("page unmarshall error: %v", err),
+		}
 	}
 
 	switch page.Name {
@@ -110,17 +127,26 @@ func doRequests(requestURL string) (Response, error) {
 		err = json.Unmarshal(body, &words)
 
 		if err != nil {
-			return nil, fmt.Errorf("unmarshal error: %s", err)
+			return nil, RequestError{
+				HTTPCode: response.StatusCode,
+				Body:     string(body),
+				Err:      fmt.Sprintf(" words unmarshall error: %v", err),
+			}
 		}
 
 		return words, nil
+
 	case "occurrence":
 		var occurrence Occurrence
 
 		err = json.Unmarshal(body, &occurrence)
 
 		if err != nil {
-			return nil, fmt.Errorf("unmarshal error: %s", err)
+			return nil, RequestError{
+				HTTPCode: response.StatusCode,
+				Body:     string(body),
+				Err:      fmt.Sprintf(" occurances unmarshall error: %v", err),
+			}
 		}
 
 		return occurrence, nil
