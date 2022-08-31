@@ -55,32 +55,49 @@ func main() {
 
 	// Declaration
 	flag.StringVar(&requestURL, "url", "", "url to access")
-	flag.StringVar(&password, "psswd", "", "psswd for the api endpoint")
+	flag.StringVar(&password, "password", "", "password for the api endpoint")
 
 	// Parse flags
 	flag.Parse()
 
+	// Check URL Validity
 	if parsedURL, err = url.ParseRequestURI(requestURL); err != nil {
 		fmt.Printf("URL is not valid error: %s\n", err)
 		flag.Usage()
 		os.Exit(1)
 	}
 
+	// Check password not empty and  try to make
+	// POST request.
+
+	if password != "" {
+		token, err := doLoginRequest(parsedURL.Scheme+"://"+parsedURL.Host+"/login", password)
+		if err != nil {
+			if requestErr, ok := err.(RequestError); ok {
+				fmt.Printf("Error: %s (HTTP Code %d, Body: %s\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
+				os.Exit(1)
+			}
+			fmt.Printf("error: %s\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("token: %s", token)
+		os.Exit(0)
+	}
+
 	res, err := doRequests(parsedURL.String())
 
 	if err != nil {
 		if requestErr, ok := err.(RequestError); ok {
-			fmt.Printf("Error: %s (HTTP Code %d, Body: %s\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
+			fmt.Printf("Error occurred: %s (HTTP Error: %d, Body: %s)\n", requestErr.Error(), requestErr.HTTPCode, requestErr.Body)
 			os.Exit(1)
 		}
-
-	}
-
-	if res == nil {
-		fmt.Printf("No response: %s\n", res)
+		fmt.Printf("Error occurred: %s\n", err)
 		os.Exit(1)
 	}
-
+	if res == nil {
+		fmt.Printf("No response\n")
+		os.Exit(1)
+	}
 	fmt.Printf("Response: %s\n", res.GetResponse())
 }
 
@@ -88,6 +105,11 @@ func doRequests(requestURL string) (Response, error) {
 
 	/* GET REQUEST LOGIC */
 	response, err := http.Get(requestURL)
+	/* To this http.Get we must provide a header
+	an Authorization header.
+	In order to achieve this we will create an
+	individual client for each session (token generated)
+	through which the connection is done. */
 
 	if err != nil {
 		// Log is used for a system error
