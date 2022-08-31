@@ -55,39 +55,71 @@ func main() {
 
 	// Declaration
 	flag.StringVar(&requestURL, "url", "", "url to access")
-	flag.StringVar(&password, "psswd", "", "psswd for the api endpoint")
+	flag.StringVar(&password, "password", "", "password for the api endpoint")
 
 	// Parse flags
 	flag.Parse()
 
+	// Check URL Validity
 	if parsedURL, err = url.ParseRequestURI(requestURL); err != nil {
 		fmt.Printf("URL is not valid error: %s\n", err)
 		flag.Usage()
 		os.Exit(1)
 	}
 
-	res, err := doRequests(parsedURL.String())
+	client := http.Client{}
+
+	// Check password not empty and  try to make
+	// POST request.
+
+	if password != "" {
+		token, err := doLoginRequest(client, parsedURL.Scheme+"://"+parsedURL.Host+"/login", password)
+		// We pass a client here but it wont do anything unless we have a token
+		// Lookup the transport.go implementation
+		// It only runs if m.token != ""
+		if err != nil {
+			if requestErr, ok := err.(RequestError); ok {
+				fmt.Printf("Error: %s (HTTP Code %d, Body: %s\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
+				os.Exit(1)
+			}
+			fmt.Printf("error: %s\n", err)
+			os.Exit(1)
+		}
+		// Only initialize a client if a password is provided
+		client.Transport = MyJWTTransport{
+			transport: http.DefaultTransport,
+			token:     token,
+		}
+		// The Transport has to be of type http.RoundTripper
+		// (back-n-forth)
+	}
+
+	res, err := doRequests(client, parsedURL.String())
 
 	if err != nil {
 		if requestErr, ok := err.(RequestError); ok {
-			fmt.Printf("Error: %s (HTTP Code %d, Body: %s\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
+			fmt.Printf("Error occurred: %s (HTTP Error: %d, Body: %s)\n", requestErr.Error(), requestErr.HTTPCode, requestErr.Body)
 			os.Exit(1)
 		}
-
-	}
-
-	if res == nil {
-		fmt.Printf("No response: %s\n", res)
+		fmt.Printf("Error occurred: %s\n", err)
 		os.Exit(1)
 	}
-
+	if res == nil {
+		fmt.Printf("No response\n")
+		os.Exit(1)
+	}
 	fmt.Printf("Response: %s\n", res.GetResponse())
 }
 
-func doRequests(requestURL string) (Response, error) {
+func doRequests(client http.Client, requestURL string) (Response, error) {
 
 	/* GET REQUEST LOGIC */
-	response, err := http.Get(requestURL)
+	response, err := client.Get(requestURL)
+	/* To this http.Get we must provide a header
+	an Authorization header.
+	In order to achieve this we will create an
+	individual client for each session (token generated)
+	through which the connection is done. */
 
 	if err != nil {
 		// Log is used for a system error
