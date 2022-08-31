@@ -67,11 +67,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	client := http.Client{}
+
 	// Check password not empty and  try to make
 	// POST request.
 
 	if password != "" {
-		token, err := doLoginRequest(parsedURL.Scheme+"://"+parsedURL.Host+"/login", password)
+		token, err := doLoginRequest(client, parsedURL.Scheme+"://"+parsedURL.Host+"/login", password)
+		// We pass a client here but it wont do anything unless we have a token
+		// Lookup the transport.go implementation
+		// It only runs if m.token != ""
 		if err != nil {
 			if requestErr, ok := err.(RequestError); ok {
 				fmt.Printf("Error: %s (HTTP Code %d, Body: %s\n", requestErr.Err, requestErr.HTTPCode, requestErr.Body)
@@ -80,11 +85,16 @@ func main() {
 			fmt.Printf("error: %s\n", err)
 			os.Exit(1)
 		}
-		fmt.Printf("token: %s", token)
-		os.Exit(0)
+		// Only initialize a client if a password is provided
+		client.Transport = MyJWTTransport{
+			transport: http.DefaultTransport,
+			token:     token,
+		}
+		// The Transport has to be of type http.RoundTripper
+		// (back-n-forth)
 	}
 
-	res, err := doRequests(parsedURL.String())
+	res, err := doRequests(client, parsedURL.String())
 
 	if err != nil {
 		if requestErr, ok := err.(RequestError); ok {
@@ -101,10 +111,10 @@ func main() {
 	fmt.Printf("Response: %s\n", res.GetResponse())
 }
 
-func doRequests(requestURL string) (Response, error) {
+func doRequests(client http.Client, requestURL string) (Response, error) {
 
 	/* GET REQUEST LOGIC */
-	response, err := http.Get(requestURL)
+	response, err := client.Get(requestURL)
 	/* To this http.Get we must provide a header
 	an Authorization header.
 	In order to achieve this we will create an

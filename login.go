@@ -16,7 +16,7 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
-func doLoginRequest(requestURL, password string) (string, error) {
+func doLoginRequest(client http.Client, requestURL, password string) (string, error) {
 	loginRequest := LoginRequest{
 		Password: password,
 	}
@@ -32,7 +32,7 @@ func doLoginRequest(requestURL, password string) (string, error) {
 	// Body is of type []bytes and must be converted
 	// for the io.Reader's Read() function
 	// Because bytes.Buffer implements the Read().
-	response, err := http.Post(requestURL, "app/json", bytes.NewBuffer(body))
+	response, err := client.Post(requestURL, "app/json", bytes.NewBuffer(body))
 
 	// The following is copied from the get-request logic
 	// and modified to suit the POST request
